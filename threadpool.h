@@ -42,7 +42,7 @@ class ThreadPool {
     void threadFunc();//define thread function
 
     private:
-    vector<Thread*> threads_;//thread list
+    vector<unique_ptr<Thread>> threads_;//thread list
     size_t initThreadSize_;
 
     queue<shared_ptr<Task>> taskQue_;

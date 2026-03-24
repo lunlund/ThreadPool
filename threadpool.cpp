@@ -14,13 +14,25 @@ void ThreadPool::setTaskQueMaxThreshHold(int threshhold){
     taskQueMaxThreshHold_=threshhold;
 }
 void ThreadPool::submitTask(shared_ptr<Task> sp){
-
+    //get lock
+    unique_lock<mutex> lock(taskQueMtx_);
+    //communication among threads, wait until the task queue is availbale
+    //the blocked time can not exceed 1s, otherwise return "submit failure error" to user
+    while(taskQue_.size()==taskQueMaxThreshHold_) {
+        notFull_.wait(lock);
+    }
+    //if available, push back this task
+    taskQue_.emplace(sp);
+    taskSize_++;
+    //if pushed successfully, notify all threads waiting for notEmpty_
+    notEmpty_.notify_all();
 }
 void ThreadPool::start(int initThreadSize){
     initThreadSize_=initThreadSize;
         //create thread object
     for(int i=0;i<initThreadSize_;i++) {
-        threads_.emplace_back(new Thread(bind(&ThreadPool::threadFunc,this)));//when creating thread object, we need pass a thread function to thread object
+        auto ptr = make_unique<Thread>(bind(&ThreadPool::threadFunc,this));
+        threads_.emplace_back(std::move(ptr));//when creating thread object, we need pass a thread function to thread object
     }
     //start all threads
     for(int i=0;i<initThreadSize_;i++) {

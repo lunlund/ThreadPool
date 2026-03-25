@@ -2,7 +2,7 @@
 #include<functional>
 #include<thread>
 #include<iostream>
-const int TASK_MAX_THRESHHOLD = 1024;
+const int TASK_MAX_THRESHHOLD = 4;
 ThreadPool::ThreadPool():initThreadSize_(4),taskSize_(0),taskQueMaxThreshHold_(TASK_MAX_THRESHHOLD),poolMode_(PoolMode::MODE_FIXED) {
 
 }
@@ -13,19 +13,23 @@ ThreadPool::~ThreadPool() {
 void ThreadPool::setTaskQueMaxThreshHold(int threshhold){
     taskQueMaxThreshHold_=threshhold;
 }
-void ThreadPool::submitTask(shared_ptr<Task> sp){
+Result ThreadPool::submitTask(shared_ptr<Task> sp){
     //get lock
     unique_lock<mutex> lock(taskQueMtx_);
     //communication among threads, wait until the task queue is availbale
     //the blocked time can not exceed 1s, otherwise return "submit failure error" to user
-    while(taskQue_.size()==taskQueMaxThreshHold_) {
-        notFull_.wait(lock);
+    if(!notFull_.wait_for(lock,chrono::seconds(1),[&](){return taskQue_.size()<taskQueMaxThreshHold_;}))
+    {
+        //the condition is not met
+        cerr<<"task queue is full, submitting task fails"<<endl;
+        return Result(sp,false);
     }
     //if available, push back this task
     taskQue_.emplace(sp);
     taskSize_++;
     //if pushed successfully, notify all threads waiting for notEmpty_
     notEmpty_.notify_all();
+    return Result(sp);
 }
 void ThreadPool::start(int initThreadSize){
     initThreadSize_=initThreadSize;
@@ -46,9 +50,30 @@ void ThreadPool::setInitThreadSize(int size){
     //record the number of threads 
     initThreadSize_=size;
 }
+//get task from task queue, and assign this one thread to one task
 void ThreadPool::threadFunc() {
-    cout<<"begin threadFunc id"<<this_thread::get_id()<<endl;
-    cout<<"end threadFunc id"<<this_thread::get_id()<<endl;
+    for(;;) {
+        shared_ptr<Task> task;
+        {
+            //get lock first
+            unique_lock<mutex> lock(taskQueMtx_);
+            //wait for not empty condition
+            notEmpty_.wait(lock,[&](){return taskQue_.size()>0;});
+            //pop one task from task queue
+            task=taskQue_.front();
+            taskQue_.pop();
+            taskSize_--;
+            if(taskQue_.size()>0) {
+                notEmpty_.notify_all();
+            }
+            notFull_.notify_all();
+        }
+        //current thread to perform this task
+        if(task!=NULL) {
+            //task->run();//move the return value to Result
+            task->exec();
+        }
+    }
 }
 /////////thread implementation
 Thread::Thread(ThreadFunc func):func_(func) {
@@ -61,4 +86,41 @@ Thread::~Thread(){
 void Thread::start() {
     thread t(func_);
     t.detach();
+}
+//////Task implementation
+Task::Task():result_(NULL){}
+
+void Task::exec(){
+    if(result_!=NULL) 
+    {
+        result_->setVal(run());
+    }
+}
+void Task::setResult(Result* res)
+{
+    result_=res;
+}
+
+
+/////Result implementation
+Result::Result(shared_ptr<Task> task,bool isValid):task_(task),isValid_(isValid) {
+    task_->setResult(this);
+}
+Any Result::get()//user call this func
+{
+    if(!isValid_)
+    {
+        return "";
+    }
+    else
+    {
+        sem_.wait();//if the task is not finished, it will be blocked here
+        return std::move(any_);
+    }
+}
+//
+void Result::setVal(Any any) {
+    //store the return value of a task
+    this->any_=std::move(any);
+    sem_.post();
 }

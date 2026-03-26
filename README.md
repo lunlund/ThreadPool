@@ -2,7 +2,7 @@
 
 A lightweight, asynchronous task execution framework built with **Modern C++17**. This project implements a robust thread-safe task queue and provides a seamless interface for concurrent programming, utilizing the Producer-Consumer design pattern.
 
-<img width="1442" height="683" alt="image" src="https://github.com/user-attachments/assets/8155bc4e-c502-40c7-a837-0dbdcd763158" />
+<img width="1442" height="683" alt="image" src="./myImg.png" />
 
 ---
 

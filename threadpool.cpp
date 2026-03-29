@@ -3,11 +3,14 @@
 #include<thread>
 #include<iostream>
 const int TASK_MAX_THRESHHOLD = 4;
-ThreadPool::ThreadPool():initThreadSize_(4),taskSize_(0),taskQueMaxThreshHold_(TASK_MAX_THRESHHOLD),poolMode_(PoolMode::MODE_FIXED) {
+ThreadPool::ThreadPool():initThreadSize_(4),taskSize_(0),taskQueMaxThreshHold_(TASK_MAX_THRESHHOLD),poolMode_(PoolMode::MODE_FIXED),isPoolRunning(0),killedThreadSize_(0) {
 
 }
 ThreadPool::~ThreadPool() {
-
+    isPoolRunning=0;
+    unique_lock<mutex> lock(taskQueMtx_);
+    notEmpty_.notify_all();
+    exitCond_.wait(lock,[&](){ return killedThreadSize_==initThreadSize_;});
 }
 
 void ThreadPool::setTaskQueMaxThreshHold(int threshhold){
@@ -32,6 +35,7 @@ Result ThreadPool::submitTask(shared_ptr<Task> sp){
     return Result(sp);
 }
 void ThreadPool::start(int initThreadSize){
+    isPoolRunning=1;
     initThreadSize_=initThreadSize;
         //create thread object
     for(int i=0;i<initThreadSize_;i++) {
@@ -52,13 +56,14 @@ void ThreadPool::setInitThreadSize(int size){
 }
 //get task from task queue, and assign this one thread to one task
 void ThreadPool::threadFunc() {
-    for(;;) {
+    while(isPoolRunning) {
         shared_ptr<Task> task;
         {
             //get lock first
             unique_lock<mutex> lock(taskQueMtx_);
             //wait for not empty condition
-            notEmpty_.wait(lock,[&](){return taskQue_.size()>0;});
+            notEmpty_.wait(lock,[&](){return taskQue_.size()>0||!isPoolRunning;});
+            if(!isPoolRunning) break;
             //pop one task from task queue
             task=taskQue_.front();
             taskQue_.pop();
@@ -74,6 +79,10 @@ void ThreadPool::threadFunc() {
             task->exec();
         }
     }
+    unique_lock<mutex> lock(taskQueMtx_);
+    killedThreadSize_++;
+    exitCond_.notify_all();
+    notEmpty_.notify_all();
 }
 /////////thread implementation
 Thread::Thread(ThreadFunc func):func_(func) {

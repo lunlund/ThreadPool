@@ -23,14 +23,15 @@ class MyTask: public Task {
     int end_;
 };
 int main() {
-    ThreadPool pool;
-    pool.start(4);
+    for(int i=1;i<=1000;i++)
+    {ThreadPool pool;
+    pool.start(30);
     Result res1=pool.submitTask(make_shared<MyTask>(1,10000000));
     Result res2=pool.submitTask(make_shared<MyTask>(10000001,20000000));
     Result res3=pool.submitTask(make_shared<MyTask>(20000001,30000000));
     uLong sum1=res1.get().cast_<uLong>();
     uLong sum2=res2.get().cast_<uLong>();
     uLong sum3=res3.get().cast_<uLong>();
-    cout<<(sum1+sum2+sum3)<<endl;
-    getchar();
+    cout<<(sum1+sum2+sum3)<<endl;}
+    //getchar();
 }

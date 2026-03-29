@@ -125,6 +125,7 @@ class ThreadPool {
     private:
     vector<unique_ptr<Thread>> threads_;//thread list
     size_t initThreadSize_;
+    atomic_size_t killedThreadSize_;
 
     queue<shared_ptr<Task>> taskQue_;
     atomic_int taskSize_;
@@ -133,8 +134,10 @@ class ThreadPool {
 
     condition_variable notFull_;//taskQueue is not full
     condition_variable notEmpty_;//taskQueue is not empty
+    condition_variable exitCond_;
 
     PoolMode poolMode_;//the current working mode of the thread pool
+    atomic_bool isPoolRunning;
 
 };
 

@@ -7,8 +7,8 @@ ThreadPool::ThreadPool():initThreadSize_(4),taskSize_(0),taskQueMaxThreshHold_(T
 
 }
 ThreadPool::~ThreadPool() {
-    isPoolRunning=0;
     unique_lock<mutex> lock(taskQueMtx_);
+    isPoolRunning=0;
     notEmpty_.notify_all();
     exitCond_.wait(lock,[&](){ return killedThreadSize_==initThreadSize_;});
 }

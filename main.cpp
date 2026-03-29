@@ -25,7 +25,7 @@ class MyTask: public Task {
 int main() {
     for(int i=1;i<=1000;i++)
     {ThreadPool pool;
-    pool.start(30);
+    pool.start(5);
     Result res1=pool.submitTask(make_shared<MyTask>(1,10000000));
     Result res2=pool.submitTask(make_shared<MyTask>(10000001,20000000));
     Result res3=pool.submitTask(make_shared<MyTask>(20000001,30000000));
